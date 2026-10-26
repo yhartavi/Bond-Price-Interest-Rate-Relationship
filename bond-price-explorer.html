@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bond Price Explorer</title>
+<style>
+  :root {
+    --bg: #f6f7fb;
+    --card: #ffffff;
+    --text: #1d2433;
+    --muted: #5f6b7f;
+    --border: #e1e5ee;
+    --accent: #2f5bea;
+    --premium: #12855b;
+    --par: #6b5bd6;
+    --discount: #c2410c;
+    --grid: #eceff5;
+    --soft: #f0f3fa;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #10131a;
+      --card: #181c25;
+      --text: #e7eaf1;
+      --muted: #9aa4b6;
+      --border: #2a3040;
+      --accent: #6d8dff;
+      --premium: #34d399;
+      --par: #a99bff;
+      --discount: #fb923c;
+      --grid: #232837;
+      --soft: #1f2430;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 24px 16px 48px; }
+  header h1 { margin: 0 0 4px; font-size: 1.7rem; }
+  header p { margin: 0 0 20px; color: var(--muted); }
+  .grid { display: grid; grid-template-columns: 340px 1fr; gap: 20px; }
+  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+  }
+  .card h2 { font-size: 1rem; margin: 0 0 14px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  .control { margin-bottom: 18px; }
+  .control label { display: flex; justify-content: space-between; font-weight: 600; font-size: .95rem; margin-bottom: 6px; }
+  .control label span.val { color: var(--accent); font-variant-numeric: tabular-nums; }
+  .control small { color: var(--muted); display: block; margin-top: 2px; font-size: .8rem; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  select {
+    width: 100%; padding: 8px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--card); color: var(--text); font-size: .95rem;
+  }
+  .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px; }
+  button {
+    padding: 9px 10px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--soft); color: var(--text); font-weight: 600; cursor: pointer; font-size: .9rem;
+  }
+  button:hover { border-color: var(--accent); }
+  button.full { grid-column: 1 / -1; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+  @media (max-width: 600px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .stat { background: var(--soft); border-radius: 10px; padding: 12px; }
+  .stat .k { font-size: .78rem; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
+  .stat .v { font-size: 1.35rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .badge {
+    display: inline-block; padding: 3px 10px; border-radius: 999px; font-weight: 700;
+    font-size: .85rem; color: #fff;
+  }
+  .explain {
+    border-left: 4px solid var(--accent); background: var(--soft);
+    padding: 12px 14px; border-radius: 8px; margin-bottom: 16px; font-size: .97rem;
+  }
+  .change { font-weight: 600; margin-top: 6px; min-height: 1.4em; }
+  .up { color: var(--premium); } .down { color: var(--discount); }
+  svg { width: 100%; height: auto; display: block; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: .85rem; color: var(--muted); margin-top: 8px; }
+  .legend i { display: inline-block; width: 18px; height: 3px; vertical-align: middle; margin-right: 6px; border-radius: 2px; }
+  .toggle { display: flex; align-items: center; gap: 8px; font-size: .9rem; margin-top: 10px; }
+  details { margin-top: 16px; }
+  summary { cursor: pointer; font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: .88rem; font-variant-numeric: tabular-nums; }
+  th, td { padding: 6px 8px; text-align: right; border-bottom: 1px solid var(--border); }
+  th:first-child, td:first-child { text-align: left; }
+  .tablewrap { max-height: 320px; overflow: auto; }
+  .lessons { margin-top: 20px; }
+  .lessons ol { margin: 0; padding-left: 20px; }
+  .lessons li { margin-bottom: 8px; }
+  .formula { font-family: ui-monospace, Menlo, Consolas, monospace; background: var(--soft); padding: 8px 10px; border-radius: 8px; display: block; margin: 8px 0; overflow-x: auto; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Bond Price Explorer</h1>
+    <p>Move the market interest rate and watch the bond price move the opposite way. The bond's coupon and par value stay fixed — only the price adjusts.</p>
+  </header>
+
+  <div class="grid">
+    <!-- Controls -->
+    <div class="card">
+      <h2>Bond Terms (fixed at issue)</h2>
+
+      <div class="control">
+        <label>Par (face) value</label>
+        <select id="par">
+          <option value="100">$100</option>
+          <option value="1000" selected>$1,000</option>
+          <option value="5000">$5,000</option>
+        </select>
+        <small>Amount repaid at maturity; coupons are a % of this.</small>
+      </div>
+
+      <div class="control">
+        <label>Coupon rate <span class="val" id="couponVal"></span></label>
+        <input type="range" id="coupon" min="0" max="12" step="0.25" value="5">
+        <small>Annual interest paid as a % of par. Never changes.</small>
+      </div>
+
+      <div class="control">
+        <label>Years to maturity <span class="val" id="yearsVal"></span></label>
+        <input type="range" id="years" min="1" max="30" step="1" value="10">
+      </div>
+
+      <div class="control">
+        <label>Coupon payments</label>
+        <select id="freq">
+          <option value="1">Annual</option>
+          <option value="2" selected>Semiannual</option>
+        </select>
+      </div>
+
+      <h2 style="margin-top:22px">Market Conditions (changes daily)</h2>
+
+      <div class="control">
+        <label>Market interest rate <span class="val" id="marketVal"></span></label>
+        <input type="range" id="market" min="0.25" max="15" step="0.25" value="5">
+        <small>The return investors can earn today on comparable new bonds (same risk and maturity).</small>
+      </div>
+
+      <div class="btns">
+        <button id="rise">Rates rise +1%</button>
+        <button id="fall">Rates fall −1%</button>
+        <button id="matchBtn" class="full">Set market rate = coupon rate</button>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div class="card">
+      <div class="stats">
+        <div class="stat"><div class="k">Bond price</div><div class="v" id="price"></div></div>
+        <div class="stat"><div class="k">Price vs. par</div><div class="v" id="diff"></div></div>
+        <div class="stat"><div class="k">Annual coupon</div><div class="v" id="annCoupon"></div></div>
+        <div class="stat"><div class="k">Trades at</div><div class="v"><span class="badge" id="status"></span></div></div>
+      </div>
+
+      <div class="explain">
+        <div id="explainText"></div>
+        <div class="change" id="changeText"></div>
+      </div>
+
+      <svg id="chart" viewBox="0 0 680 380" role="img" aria-label="Bond price versus market interest rate"></svg>
+      <div class="legend">
+        <span><i style="background:var(--accent)"></i>Price at each market rate</span>
+        <span><i style="background:var(--par)"></i>Par value</span>
+        <span id="legendCompare" style="display:none"><i style="background:var(--muted);opacity:.6"></i>Short (2-yr) &amp; long (30-yr) bonds</span>
+      </div>
+      <label class="toggle"><input type="checkbox" id="compare"> Compare with 2-year and 30-year bonds (shows why longer bonds are riskier)</label>
+
+      <details>
+        <summary>Show cash flows and their present values</summary>
+        <p style="color:var(--muted);font-size:.88rem;margin:8px 0 0">Each future payment is discounted at the market rate. The bond price is the sum of these present values.</p>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>Period</th><th>Cash flow</th><th>Discount factor</th><th>Present value</th></tr></thead>
+            <tbody id="cfBody"></tbody>
+            <tfoot><tr><th>Total = Price</th><th></th><th></th><th id="cfTotal"></th></tr></tfoot>
+          </table>
+        </div>
+      </details>
+    </div>
+  </div>
+
+  <div class="card lessons">
+    <h2>What to notice</h2>
+    <ol>
+      <li><strong>Inverse relationship:</strong> the blue curve slopes down. Higher market rate → lower price; lower market rate → higher price.</li>
+      <li><strong>Par point:</strong> the price equals par exactly where the market rate equals the coupon rate.</li>
+      <li><strong>Discount vs. premium:</strong> coupon below the market rate → discount; coupon above the market rate → premium.</li>
+      <li><strong>Maturity matters:</strong> turn on the comparison — the 30-year curve is much steeper, so its price swings more for the same rate change.</li>
+      <li><strong>Convexity:</strong> press “Rates fall −1%” then “Rates rise +1%” from the same start: the gain from a fall is bigger than the loss from a rise.</li>
+    </ol>
+    <span class="formula">Price = Σ [ C / (1 + r)<sup>t</sup> ] + Par / (1 + r)<sup>n</sup></span>
+    <p style="color:var(--muted);font-size:.88rem;margin:0">C = coupon per period, r = market rate per period, n = number of periods. Because r is in the denominator, a higher rate makes every future payment worth less today.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  const els = {
+    par: $('par'), coupon: $('coupon'), years: $('years'), freq: $('freq'), market: $('market'),
+    compare: $('compare')
+  };
+  const money = v => '$' + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const money0 = v => '$' + Math.round(v).toLocaleString();
+  const pct = v => v.toFixed(2) + '%';
+  const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+  function bondPrice(par, couponPct, marketPct, years, m) {
+    const c = par * couponPct / 100 / m;
+    const r = marketPct / 100 / m;
+    const n = Math.round(years * m);
+    if (r === 0) return c * n + par;
+    const annuity = c * (1 - Math.pow(1 + r, -n)) / r;
+    return annuity + par * Math.pow(1 + r, -n);
+  }
+
+  let lastMarket = null, lastPrice = null;
+
+  function read() {
+    return {
+      par: +els.par.value, coupon: +els.coupon.value, years: +els.years.value,
+      m: +els.freq.value, market: +els.market.value, compare: els.compare.checked
+    };
+  }
+
+  function update(trackChange) {
+    const s = read();
+    $('couponVal').textContent = pct(s.coupon);
+    $('marketVal').textContent = pct(s.market);
+    $('yearsVal').textContent = s.years + (s.years === 1 ? ' year' : ' years');
+
+    const price = bondPrice(s.par, s.coupon, s.market, s.years, s.m);
+    const diff = price - s.par;
+    const annCoupon = s.par * s.coupon / 100;
+
+    $('price').textContent = money(price);
+    $('diff').textContent = (diff >= 0 ? '+' : '−') + money(Math.abs(diff)).slice(0);
+    $('annCoupon').textContent = money(annCoupon);
+
+    const status = $('status');
+    let statusName, color;
+    if (Math.abs(diff) < 0.005) { statusName = 'Par'; color = css('--par'); }
+    else if (diff > 0) { statusName = 'Premium'; color = css('--premium'); }
+    else { statusName = 'Discount'; color = css('--discount'); }
+    status.textContent = statusName;
+    status.style.background = color;
+    $('diff').style.color = statusName === 'Par' ? '' : color;
+
+    // Explanation
+    let text;
+    if (statusName === 'Par') {
+      text = `The coupon rate (${pct(s.coupon)}) <strong>equals</strong> the market rate (${pct(s.market)}). This bond pays exactly what new bonds pay, so it is worth exactly its par value of ${money0(s.par)}.`;
+    } else if (statusName === 'Discount') {
+      text = `The market rate (${pct(s.market)}) is <strong>higher</strong> than the coupon rate (${pct(s.coupon)}). New bonds pay more, so no one will pay full par for this one. The price drops by ${money(Math.abs(diff))} until a buyer earns ${pct(s.market)} — the extra return comes from buying below par and getting ${money0(s.par)} back at maturity.`;
+    } else {
+      text = `The market rate (${pct(s.market)}) is <strong>lower</strong> than the coupon rate (${pct(s.coupon)}). This bond pays more than new bonds, so buyers compete for it and pay ${money(diff)} above par. Their overall return falls to ${pct(s.market)} because they pay more than the ${money0(s.par)} they will get back.`;
+    }
+    $('explainText').innerHTML = text;
+
+    // Change tracking
+    const ct = $('changeText');
+    if (trackChange && lastMarket !== null && Math.abs(s.market - lastMarket) > 1e-9) {
+      const dr = s.market - lastMarket, dp = price - lastPrice;
+      const rArrow = dr > 0 ? '↑' : '↓', pArrow = dp > 0 ? '↑' : '↓';
+      ct.className = 'change ' + (dp > 0 ? 'up' : 'down');
+      ct.textContent = `Market rate ${rArrow} ${Math.abs(dr).toFixed(2)}%  →  Price ${pArrow} ${money(Math.abs(dp))} (${(dp / lastPrice * 100).toFixed(2)}%)`;
+    } else if (!trackChange) {
+      ct.textContent = 'Move the market rate to see how the price responds.';
+      ct.className = 'change';
+    }
+    lastMarket = s.market; lastPrice = price;
+
+    drawChart(s, price);
+    drawTable(s, price);
+  }
+
+  function drawChart(s, price) {
+    const svg = $('chart');
+    const W = 680, H = 380, L = 70, R = 20, T = 20, B = 50;
+    const pw = W - L - R, ph = H - T - B;
+    const xMin = 0, xMax = 15;
+    const rates = [];
+    for (let r = 0.25; r <= 15.0001; r += 0.25) rates.push(r);
+
+    const series = [{ years: s.years, main: true }];
+    if (s.compare) {
+      if (s.years !== 2) series.push({ years: 2 });
+      if (s.years !== 30) series.push({ years: 30 });
+    }
+    series.forEach(se => se.pts = rates.map(r => [r, bondPrice(s.par, s.coupon, r, se.years, s.m)]));
+
+    let yMax = Math.max(s.par * 1.05, ...series.flatMap(se => se.pts.map(p => p[1])));
+    let yMin = Math.min(...series.flatMap(se => se.pts.map(p => p[1])));
+    yMin = Math.max(0, Math.min(yMin, s.par * 0.5));
+    const step = niceStep((yMax - yMin) / 6);
+    yMin = Math.floor(yMin / step) * step;
+    yMax = Math.ceil(yMax / step) * step;
+
+    const X = r => L + (r - xMin) / (xMax - xMin) * pw;
+    const Y = p => T + (1 - (p - yMin) / (yMax - yMin)) * ph;
+
+    const grid = css('--grid'), muted = css('--muted'), text = css('--text');
+    const accent = css('--accent'), parC = css('--par');
+    let out = '';
+
+    // Grid + y labels
+    for (let v = yMin; v <= yMax + 1e-6; v += step) {
+      out += `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" stroke="${grid}"/>`;
+      out += `<text x="${L - 8}" y="${Y(v) + 4}" text-anchor="end" font-size="12" fill="${muted}">${money0(v)}</text>`;
+    }
+    for (let r = 0; r <= 15; r += 3) {
+      out += `<line x1="${X(r)}" x2="${X(r)}" y1="${T}" y2="${H - B}" stroke="${grid}"/>`;
+      out += `<text x="${X(r)}" y="${H - B + 18}" text-anchor="middle" font-size="12" fill="${muted}">${r}%</text>`;
+    }
+    out += `<text x="${L + pw / 2}" y="${H - 8}" text-anchor="middle" font-size="13" fill="${text}">Market interest rate</text>`;
+    out += `<text transform="translate(16 ${T + ph / 2}) rotate(-90)" text-anchor="middle" font-size="13" fill="${text}">Bond price</text>`;
+
+    // Shaded regions labels
+    if (s.coupon > 0.25 && s.coupon < 15) {
+      out += `<line x1="${X(s.coupon)}" x2="${X(s.coupon)}" y1="${T}" y2="${H - B}" stroke="${parC}" stroke-dasharray="3 4" opacity=".7"/>`;
+      out += `<text x="${X(s.coupon) - 6}" y="${T + 14}" text-anchor="end" font-size="11" fill="${css('--premium')}">← Premium</text>`;
+      out += `<text x="${X(s.coupon) + 6}" y="${T + 14}" font-size="11" fill="${css('--discount')}">Discount →</text>`;
+    }
+
+    // Par line
+    out += `<line x1="${L}" x2="${W - R}" y1="${Y(s.par)}" y2="${Y(s.par)}" stroke="${parC}" stroke-width="2" stroke-dasharray="6 5"/>`;
+    out += `<text x="${W - R - 4}" y="${Y(s.par) - 6}" text-anchor="end" font-size="12" fill="${parC}" font-weight="600">Par ${money0(s.par)}</text>`;
+
+    // Curves
+    series.slice().reverse().forEach(se => {
+      const d = se.pts.map((p, i) => (i ? 'L' : 'M') + X(p[0]).toFixed(1) + ' ' + Y(p[1]).toFixed(1)).join(' ');
+      if (se.main) {
+        out += `<path d="${d}" fill="none" stroke="${accent}" stroke-width="3"/>`;
+      } else {
+        out += `<path d="${d}" fill="none" stroke="${muted}" stroke-width="2" opacity=".6" stroke-dasharray="${se.years === 2 ? '2 4' : '8 4'}"/>`;
+        const last = se.pts[se.pts.length - 1];
+        out += `<text x="${X(last[0]) - 4}" y="${Y(last[1]) - 6}" text-anchor="end" font-size="11" fill="${muted}">${se.years}-yr</text>`;
+      }
+    });
+
+    // Current point
+    const cx = X(s.market), cy = Y(price);
+    out += `<line x1="${cx}" x2="${cx}" y1="${cy}" y2="${H - B}" stroke="${accent}" stroke-dasharray="2 3" opacity=".6"/>`;
+    out += `<circle cx="${cx}" cy="${cy}" r="7" fill="${accent}" stroke="${css('--card')}" stroke-width="3"/>`;
+    const labelLeft = cx > W - 170;
+    out += `<text x="${cx + (labelLeft ? -12 : 12)}" y="${cy - 10}" text-anchor="${labelLeft ? 'end' : 'start'}" font-size="13" font-weight="700" fill="${text}">${money(price)} at ${pct(s.market)}</text>`;
+
+    svg.innerHTML = out;
+    $('legendCompare').style.display = s.compare ? '' : 'none';
+  }
+
+  function niceStep(raw) {
+    const p = Math.pow(10, Math.floor(Math.log10(raw)));
+    const f = raw / p;
+    return (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * p;
+  }
+
+  function drawTable(s, price) {
+    const c = s.par * s.coupon / 100 / s.m;
+    const r = s.market / 100 / s.m;
+    const n = Math.round(s.years * s.m);
+    const unit = s.m === 1 ? 'Year' : 'Half-year';
+    let rows = '';
+    for (let t = 1; t <= n; t++) {
+      const cf = c + (t === n ? s.par : 0);
+      const df = Math.pow(1 + r, -t);
+      rows += `<tr><td>${unit} ${t}${t === n ? ' (coupon + par)' : ''}</td><td>${money(cf)}</td><td>${df.toFixed(4)}</td><td>${money(cf * df)}</td></tr>`;
+    }
+    $('cfBody').innerHTML = rows;
+    $('cfTotal').textContent = money(price);
+  }
+
+  // Events
+  els.market.addEventListener('input', () => update(true));
+  ['par', 'coupon', 'years', 'freq', 'compare'].forEach(k =>
+    els[k].addEventListener('input', () => { lastMarket = null; update(false); }));
+
+  function nudge(delta) {
+    const v = Math.min(15, Math.max(0.25, +els.market.value + delta));
+    els.market.value = v;
+    update(true);
+  }
+  $('rise').addEventListener('click', () => nudge(1));
+  $('fall').addEventListener('click', () => nudge(-1));
+  $('matchBtn').addEventListener('click', () => {
+    els.market.value = Math.max(0.25, +els.coupon.value);
+    update(true);
+  });
+
+  if (window.matchMedia) {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => update(false));
+  }
+
+  update(false);
+})();
+</script>
+</body>
+</html>
